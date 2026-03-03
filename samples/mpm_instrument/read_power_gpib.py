@@ -10,7 +10,7 @@ rm = pyvisa.ResourceManager()
 mpm_resource_name = 'GPIB0::16::INSTR'
 
 mpm = rm.open_resource(mpm_resource_name,
-                       read_termination="\n")
+                       read_termination='\n')
 
 print(mpm.query("*IDN?"))
 
