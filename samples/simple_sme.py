@@ -51,8 +51,8 @@ if __name__ == "__main__":
     # print(rm.list_resources())
 
     # Connect to the TSL and MPM instruments
-    tsl_instrument = rm.open_resource("GPIB2::3::INSTR", read_termination = '\r\n')
-    mpm_instrument = rm.open_resource("GPIB2::15::INSTR", read_termination = '\n')
+    tsl_instrument = rm.open_resource("GPIB0::1::INSTR", read_termination = '\r\n')
+    mpm_instrument = rm.open_resource("GPIB1::15::INSTR", read_termination = '\n')
 
     # Uncomment the below code to use TCPIP connection
     # tsl_instrument = rm.open_resource("TCPIP::192.168.1.152::5000::SOCKET",

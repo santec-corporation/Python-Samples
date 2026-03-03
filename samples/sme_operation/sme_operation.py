@@ -25,6 +25,7 @@ class SME:
     def __init__(self, tsl, mpm):
         self.laser = tsl
         self.power_meter = mpm
+        self.scan_time = 0.0
         logger.info("Initialized SME process.")
 
 
@@ -35,6 +36,7 @@ class SME:
         step_wavelength: float,
         output_power: float,
         scan_speed: float,
+        cycle: int = 1
     ):
         """Configure the TSL."""
         logger.info("Configuring TSL parameters.")
@@ -43,33 +45,44 @@ class SME:
         self.laser.write('*CLS')  # Clear status
         self.laser.write('*RST')  # Reset device
 
+        # Wait time for the TSL to reset.
+        time.sleep(1)
+
         # Sets the command set to Legacy.
-        self.laser.write('SYST:COMM:COD 0')
+        self.laser.write(':SYST:COMM:COD 0')
 
         # Sets the command delimiter for GPIB communication.
-        self.laser.write('SYST:COMM:GPIB:DEL 2')
+        self.laser.write(':SYST:COMM:GPIB:DEL 2')
 
-        # Turn on output if off
-        if int(self.laser.query('POW:STAT?')) == 0:
-            self.laser.write('POW:STAT 1')
+        # Turn on the laser output if off
+        if int(self.laser.query(':POW:STAT?')) == 0:
+            self.laser.write(':POW:STAT 1')
             while (
                 int(self.laser.query('*OPC?')) == 0
             ):  # Queries the completion of operation.
                 time.sleep(0.5)
 
         # Units and mode settings
-        self.laser.write('POW:UNIT 0')  # Set power unit to dBm
-        self.laser.write('WAV:UNIT 0')  # Set wavelength unit to nm
-        self.laser.write('POW:ATT:AUT 1')  # Auto power control mode
-        self.laser.write('COHCtrl 0')  # Disable coherence control
-        self.laser.write('POW:SHUT 0')  # Open the internal shutter
+        self.laser.write(':POW:UNIT 0')  # Set power unit to dBm
+        self.laser.write(':WAV:UNIT 0')  # Set wavelength unit to nm
+        self.laser.write(':POW:ATT:AUT 1')  # Auto power control mode
+        self.laser.write(':COHCtrl 0')  # Disable coherence control
+        self.laser.write(':POW:SHUT 0')  # Open the internal shutter
 
         # Scan settings
-        self.laser.write(f'POW {output_power}')  # Set output power
-        self.laser.write(f'WAV:SWE:STAR {start_wavelength}')  # Set start wavelength
-        self.laser.write(f'WAV:SWE:STOP {stop_wavelength}')  # Set stop wavelength
-        self.laser.write(f'WAV:SWE:SPE {scan_speed}')  # Set sweep speed
-        self.laser.write(f'TRIG:OUTP:STEP {step_wavelength}')  # Set trigger step size
+        self.laser.write(':WAV:SWE:MOD 1')  # Set the Continuous sweep mode and One way
+        self.laser.write(f':POW {output_power}')  # Set output power
+        self.laser.write(f':WAV:SWE:STAR {start_wavelength}')  # Set start wavelength
+        self.laser.write(f':WAV:SWE:STOP {stop_wavelength}')  # Set stop wavelength
+        self.laser.write(f':WAV:SWE:SPE {scan_speed}')  # Set sweep speed
+        self.laser.write(f':WAV:SWE:CYCL {cycle}')  # Set scan cycles
+
+        # Trigger settings
+        self.laser.write(f':TRIG:OUTP:STEP {step_wavelength}')  # Set trigger step size
+        self.laser.write(':TRIG:INP:EXT 1')  # Enables the external trigger input
+        self.laser.write(':TRIG:OUTP 3')  # Set the timing of the trigger signal output to Step.
+
+        self.scan_time = (stop_wavelength - start_wavelength) / scan_speed
 
 
     def configure_mpm(
@@ -152,32 +165,29 @@ class SME:
         scan_status = int(self.laser.query(':WAV:SWE?'))
         while scan_status != 3:
             self.laser.write(':WAV:SWE 1')
+            time.sleep(0.1)
             scan_status = int(self.laser.query(':WAV:SWE?'))
-            time.sleep(0.2)
 
         # Issue software trigger to the TSL
-        self.laser.write(':WAV:SWE:SOFT')
+        self.laser.write(':TRIG:INP:SOFT')
 
         # Start timer
         start_time = time.time()
 
-        # Wait for measurements to complete
-        while (
-                int(self.power_meter.query("STAT?").split(',')[0]) == 0
-        ):
-            # Print the MPM logging status
-            if display_logging_status:
-                status, count = self.power_meter.query("STAT?").split(',')
-                print_string = f"Logging Status: {status}. Data Count: {count}"
-                logger.debug(print_string)
-                print(print_string)
-            time.sleep(0.2)
+        # Wait for the scan to complete
+        time.sleep(self.scan_time)
+
+        # # Check TSL status if the sweep is completed
+        # scan_status = int(self.laser.query(':WAV:SWE?'))
+        # while scan_status != 0:
+        #     time.sleep(0.1)
+        #     scan_status = int(self.laser.query(':WAV:SWE?'))
 
         # Scan end time and calculate elapsed time
         end_time = time.time()
         elapsed_time = round(end_time - start_time, 2)
 
-        status, count = self.power_meter.query("STAT?").split(',')
+        status, count = self.power_meter.query('STAT?').split(',')
         print_string = f"Logging Status: {status}. Total Data Count: {count}"
         logger.info(print_string)
         print(f"\n{print_string}")
