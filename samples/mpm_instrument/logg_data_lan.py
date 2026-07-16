@@ -23,5 +23,5 @@ count = int(mpm.query('LOGN?'))
 print("Logging count: ", count)
 
 # Get the log data.
-log_data = read_mpm_data(mpm, 'LOGG? 0,1', count, '\r')
+log_data = read_mpm_data(mpm, 'LOGG? 0,1', count)
 print("Log data length: ", len(log_data))

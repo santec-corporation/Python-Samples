@@ -12,8 +12,7 @@ rm = pyvisa.ResourceManager()
 gpib_resource = "GPIB1::15::INSTR"
 
 # Open a connection to the instrument using the specified GPIB address
-mpm = rm.open_resource(gpib_resource)
-mpm.read_termination = '\n'
+mpm = rm.open_resource(gpib_resource, read_termination = '\n')
 
 # Query and print the identification string of the connected instrument
 idn = mpm.query('*IDN?')
